@@ -3,7 +3,7 @@ name: WatchVuln Monitor
 on:
   schedule:
     - cron: '*/30 * * * *'
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   monitor:
@@ -27,22 +27,10 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Cache Go modules
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Download dependencies
-        run: go mod download
-
       - name: Build WatchVuln binary
         run: |
-          CGO_ENABLED=1 go build -ldflags "-s -w" -o watchvuln ./cmd/watchvuln
+          go mod download
+          CGO_ENABLED=1 go build -ldflags "-s -w" -o watchvuln main.go
 
       - name: Check if database exists
         id: check_db
@@ -56,23 +44,16 @@ jobs:
       - name: Run WatchVuln (First time)
         if: steps.check_db.outputs.db_exists == 'false'
         env:
-          DB_CONN: sqlite3:///github/workspace/vuln_v3.sqlite3
           DINGDING_ACCESS_TOKEN: ${{ secrets.DINGDING_TOKEN }}
           DINGDING_SECRET: ${{ secrets.DINGDING_SECRET }}
-        run: |
-          chmod +x ./watchvuln
-          ./watchvuln
+        run: ./watchvuln --db sqlite3://vuln_v3.sqlite3
 
       - name: Run WatchVuln (Subsequent runs)
         if: steps.check_db.outputs.db_exists == 'true'
         env:
-          DB_CONN: sqlite3:///github/workspace/vuln_v3.sqlite3
-          DIFF: "1"
           DINGDING_ACCESS_TOKEN: ${{ secrets.DINGDING_TOKEN }}
           DINGDING_SECRET: ${{ secrets.DINGDING_SECRET }}
-        run: |
-          chmod +x ./watchvuln
-          ./watchvuln
+        run: ./watchvuln --db sqlite3://vuln_v3.sqlite3 --diff
 
       - name: Commit database changes
         run: |
