@@ -1,0 +1,83 @@
+name: WatchVuln Monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync fork with upstream
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        with:
+          upstream_sync_repo: zema1/watchvuln
+          upstream_sync_branch: main
+          target_sync_branch: main
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build WatchVuln binary
+        run: |
+          CGO_ENABLED=1 go build -ldflags "-s -w" -o watchvuln ./cmd/watchvuln
+
+      - name: Check if database exists
+        id: check_db
+        run: |
+          if [ -f "vuln_v3.sqlite3" ]; then
+            echo "db_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "db_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run WatchVuln (First time)
+        if: steps.check_db.outputs.db_exists == 'false'
+        env:
+          DB_CONN: sqlite3:///github/workspace/vuln_v3.sqlite3
+          DINGDING_ACCESS_TOKEN: ${{ secrets.DINGDING_TOKEN }}
+          DINGDING_SECRET: ${{ secrets.DINGDING_SECRET }}
+        run: |
+          chmod +x ./watchvuln
+          ./watchvuln
+
+      - name: Run WatchVuln (Subsequent runs)
+        if: steps.check_db.outputs.db_exists == 'true'
+        env:
+          DB_CONN: sqlite3:///github/workspace/vuln_v3.sqlite3
+          DIFF: "1"
+          DINGDING_ACCESS_TOKEN: ${{ secrets.DINGDING_TOKEN }}
+          DINGDING_SECRET: ${{ secrets.DINGDING_SECRET }}
+        run: |
+          chmod +x ./watchvuln
+          ./watchvuln
+
+      - name: Commit database changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add vuln_v3.sqlite3
+          git diff --staged --quiet || git commit -m "Update vulnerability database [$(date +'%Y-%m-%d %H:%M:%S')]"
+          git push
