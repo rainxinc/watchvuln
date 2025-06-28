@@ -43,14 +43,13 @@ jobs:
 
       - name: Run WatchVuln (First time)
         if: steps.check_db.outputs.db_exists == 'false'
-        timeout-minutes: 20
         run: |
-          ./watchvuln --db sqlite3://vuln_v3.sqlite3 --dt ${{ secrets.DINGDING_TOKEN }} --ds ${{ secrets.DINGDING_SECRET }}
+          ./watchvuln --db sqlite3://vuln_v3.sqlite3 --dt ${{ secrets.DINGDING_TOKEN }} --ds ${{ secrets.DINGDING_SECRET }} -s "avd,nox,oscs,threatbook,seebug,struts2,kev,venustech,chaitin"
 
       - name: Run WatchVuln (Subsequent runs)
         if: steps.check_db.outputs.db_exists == 'true'
         run: |
-          ./watchvuln --db sqlite3://vuln_v3.sqlite3 --dt ${{ secrets.DINGDING_TOKEN }} --ds ${{ secrets.DINGDING_SECRET }} --diff
+          ./watchvuln --db sqlite3://vuln_v3.sqlite3 --dt ${{ secrets.DINGDING_TOKEN }} --ds ${{ secrets.DINGDING_SECRET }} -s "avd,nox,oscs,threatbook,seebug,struts2,kev,venustech,chaitin" --diff
 
       - name: Commit database changes
         run: |
