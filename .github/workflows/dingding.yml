@@ -2,7 +2,8 @@ name: WatchVuln Monitor
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    # 在北京时间 07:00-23:59 执行（UTC 23:00-15:59）
+    - cron: '0,30 23,0-15 * * *'
   workflow_dispatch:
 
 jobs:
