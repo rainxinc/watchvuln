@@ -9,6 +9,12 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
+      - name: Set system timezone to Beijing
+        run: |
+          sudo timedatectl set-timezone Asia/Shanghai
+          echo "Current time: $(date)"
+          echo "Timezone: $(timedatectl show --property=Timezone --value)"
+
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -44,16 +50,20 @@ jobs:
       - name: Run WatchVuln (First time)
         if: steps.check_db.outputs.db_exists == 'false'
         run: |
+          echo "Starting first time run at: $(date)"
           timeout 300 ./watchvuln --db sqlite3://vuln_v3.sqlite3 --dt ${{ secrets.DINGDING_TOKEN }} --ds ${{ secrets.DINGDING_SECRET }} -s "avd,nox,oscs,threatbook,seebug,struts2,kev,venustech,chaitin" || true
-          echo "First time run completed (or timed out after 5 minutes)"
+          echo "First time run completed (or timed out after 5 minutes) at: $(date)"
 
       - name: Run WatchVuln (Subsequent runs)
         if: steps.check_db.outputs.db_exists == 'true'
         run: |
+          echo "Starting subsequent run at: $(date)"
           ./watchvuln --db sqlite3://vuln_v3.sqlite3 --dt ${{ secrets.DINGDING_TOKEN }} --ds ${{ secrets.DINGDING_SECRET }} -s "avd,nox,oscs,threatbook,seebug,struts2,kev,venustech,chaitin" --diff
+          echo "Subsequent run completed at: $(date)"
 
       - name: Commit database changes
         run: |
+          echo "Committing changes at: $(date)"
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add -f vuln_v3.sqlite3
